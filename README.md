@@ -90,6 +90,17 @@ No build step, no pip packages — pure Python standard library.
 - Dedup is by Glooko `guid`, persisted to `/data/uploaded.json`.
 - This is unofficial and reverse-engineered from observed traffic; Glooko could change their site at any time.
 
+
+## Timezone note (important for UK/EU)
+
+Glooko returns the **pump's local clock time** but labels it `Z` (UTC) with a
+`pumpTimestampUtcOffset` of `+00:00`, even when your pump is on a non-UTC timezone.
+If uploaded as-is, treatments land an hour (or more) ahead of your glucose curve.
+
+This uploader corrects for **UK time (Europe/London, DST-aware)** in `to_utc()` —
+i.e. it subtracts 1h during BST and 0h during GMT. **If you're not in the UK**, edit
+`to_utc()` to apply your own local→UTC offset (or set your pump's clock to true UTC).
+
 ## License
 
 MIT

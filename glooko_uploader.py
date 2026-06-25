@@ -18,6 +18,26 @@ UA  = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHT
 GUID= "1e0c094e-1e54-4a4f-8e6a-f94484b53789"
 NSH = hashlib.sha1(NS_SECRET.encode()).hexdigest()
 
+def _last_sunday(y, m):
+    import datetime
+    d = datetime.date(y, m, 31)
+    while d.weekday() != 6:
+        d -= datetime.timedelta(days=1)
+    return d
+
+def to_utc(ts):
+    """Glooko reports pump-local UK time labelled as 'Z'. Convert to true UTC (DST-aware)."""
+    import datetime
+    if not ts:
+        return ts
+    try:
+        naive = datetime.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        return ts
+    bst = _last_sunday(naive.year, 3) <= naive.date() < _last_sunday(naive.year, 10)
+    utc = naive - datetime.timedelta(hours=1 if bst else 0)
+    return utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
 def log(m): print(f"[glooko] {m}", flush=True)
 
 def load_state():
@@ -69,7 +89,7 @@ def run_once(state):
         ins   = b.get("insulinDelivered") or 0
         if not (carbs or ins):
             state.add(g); continue
-        t = {"created_at": b.get("pumpTimestamp"), "enteredBy": "glooko-bridge", "glookoGuid": g,
+        t = {"created_at": to_utc(b.get("pumpTimestamp")), "enteredBy": "glooko-bridge", "glookoGuid": g,
              "eventType": "Meal Bolus" if carbs > 0 else "Correction Bolus"}
         if ins:   t["insulin"] = round(float(ins), 2)
         if carbs: t["carbs"]   = round(float(carbs), 1)
@@ -80,7 +100,7 @@ def run_once(state):
         if not g or g in state: continue
         carbs = f.get("carbs") or f.get("carbsInput") or 0
         if carbs:
-            ns_post({"created_at": f.get("timestamp") or f.get("pumpTimestamp"), "eventType": "Carb Correction",
+            ns_post({"created_at": to_utc(f.get("timestamp") or f.get("pumpTimestamp")), "eventType": "Carb Correction",
                      "carbs": round(float(carbs),1), "enteredBy": "glooko-bridge", "glookoGuid": g}); new += 1
         state.add(g)
     # manual insulin injections
@@ -89,7 +109,7 @@ def run_once(state):
         if not g or g in state: continue
         u = i.get("value") or i.get("units") or i.get("insulin") or 0
         if u:
-            ns_post({"created_at": i.get("timestamp") or i.get("pumpTimestamp"), "eventType": "Correction Bolus",
+            ns_post({"created_at": to_utc(i.get("timestamp") or i.get("pumpTimestamp")), "eventType": "Correction Bolus",
                      "insulin": round(float(u),2), "enteredBy": "glooko-bridge", "glookoGuid": g}); new += 1
         state.add(g)
     log(f"uploaded {new} new treatment(s)")
