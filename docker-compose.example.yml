@@ -1,0 +1,20 @@
+services:
+  glooko:
+    image: python:3.12-slim
+    container_name: nightscout-glooko
+    restart: unless-stopped
+    volumes:
+      - ./glooko_uploader.py:/app/glooko_uploader.py:ro
+      - glooko-state:/data
+    environment:
+      GLOOKO_EMAIL: you@example.com
+      GLOOKO_PASSWORD: your-glooko-password
+      GLOOKO_REGION: eu
+      NIGHTSCOUT_URL: http://nightscout:1337
+      NIGHTSCOUT_SECRET: your-nightscout-api-secret
+      INTERVAL_MIN: "10"
+      LOOKBACK_DAYS: "3"
+    command: python /app/glooko_uploader.py
+
+volumes:
+  glooko-state:
